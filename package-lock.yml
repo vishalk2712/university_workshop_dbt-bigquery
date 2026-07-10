@@ -1,0 +1,11 @@
+packages:
+- git: https://github.com/dbt-labs/dbt-audit-helper.git
+  name: audit_helper
+  revision: 71817f0a7fa3df9f63adb90db0cf28f7423f720b
+- package: godatadriven/dbt_date
+  name: dbt_date
+  version: 0.19.0
+- package: dbt-labs/dbt_utils
+  name: dbt_utils
+  version: 1.3.3
+sha1_hash: 71ace3bd36af71c8bc9b484e66bc38addb7262a1
