@@ -1,0 +1,17 @@
+# dbt Cloud CLI does not use a profiles.yml file.
+# We need one for sqlfluff to run the dbt templater in CI,
+# which utilizes dbt-core internally.
+
+snowflake:
+  target: dev
+  outputs:
+    dev:
+      type: snowflake
+      threads: 4
+      authenticator: externalbrowser
+      account: y
+      user: y
+      database: y
+      warehouse: y
+      schema: y
+      role: y
