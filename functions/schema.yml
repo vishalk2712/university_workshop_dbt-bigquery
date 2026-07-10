@@ -1,0 +1,27 @@
+functions:
+  - name: add_days
+    description: calculates a date by adding the specified number of days
+    arguments:
+      - name: datetime
+        data_type: timestamp
+        description: the datetime to add days to
+      - name: days
+        data_type: integer
+        description: the number of days to add
+    returns:
+      data_type: timestamp
+
+  - name: double_then_sum
+    description: doubles the given numbers and then sums them
+    config:
+      entry_point: dts
+      runtime_version: "3.13"
+    arguments:
+      - name: number1
+        data_type: integer
+        description: the first number to double
+      - name: number2
+        data_type: integer
+        description: the second number to double
+    returns:
+      data_type: integer
