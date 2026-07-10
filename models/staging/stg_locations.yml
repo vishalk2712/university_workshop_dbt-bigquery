@@ -1,0 +1,135 @@
+models:
+  - name: stg_locations
+    description: List of open locations with basic cleaning and transformation applied, one row per location.
+    columns:
+      - name: location_id
+        description: The unique key for each location.
+        data_tests:
+          - not_null
+          - unique
+
+unit_tests:
+  - name: test_does_location_opened_at_trunc_to_date
+    description: "Check that opened_at timestamp is properly truncated to a date."
+    model: stg_locations
+    given:
+      - input: source('ecom', 'raw_stores')
+        rows:
+          - {
+              id: 1,
+              name: "Vice City",
+              tax_rate: 0.2,
+              opened_at: "2016-09-01T00:00:00",
+            }
+          - {
+              id: 2,
+              name: "San Andreas",
+              tax_rate: 0.1,
+              opened_at: "2079-10-27T23:59:59.9999",
+            }
+    expect:
+      rows:
+        - {
+            location_id: 1,
+            location_name: "Vice City",
+            tax_rate: 0.2,
+            opened_date: "2016-09-01",
+          }
+        - {
+            location_id: 2,
+            location_name: "San Andreas",
+            tax_rate: 0.1,
+            opened_date: "2079-10-27",
+          }
+
+  - name: ut_stg_locations_renames_id_to_location_id
+    description: "Source id becomes location_id."
+    model: stg_locations
+    given:
+      - input: source('ecom', 'raw_stores')
+        rows:
+          - {id: 7, name: "Liberty City", tax_rate: 0.0, opened_at: "2020-01-01T00:00:00"}
+    expect:
+      rows:
+        - {location_id: 7}
+
+  - name: ut_stg_locations_renames_name_to_location_name
+    description: "Source name becomes location_name."
+    model: stg_locations
+    given:
+      - input: source('ecom', 'raw_stores')
+        rows:
+          - {id: 1, name: "Los Santos", tax_rate: 0.0, opened_at: "2020-01-01T00:00:00"}
+    expect:
+      rows:
+        - {location_id: 1, location_name: "Los Santos"}
+
+  - name: ut_stg_locations_passes_through_tax_rate
+    description: "tax_rate is carried through unchanged."
+    model: stg_locations
+    given:
+      - input: source('ecom', 'raw_stores')
+        rows:
+          - {id: 1, name: "Store", tax_rate: 0.0825, opened_at: "2020-01-01T00:00:00"}
+    expect:
+      rows:
+        - {location_id: 1, tax_rate: 0.0825}
+
+  - name: ut_stg_locations_handles_zero_tax_rate
+    description: "A zero tax rate is preserved (not treated as null)."
+    model: stg_locations
+    given:
+      - input: source('ecom', 'raw_stores')
+        rows:
+          - {id: 1, name: "Tax Free", tax_rate: 0.0, opened_at: "2020-01-01T00:00:00"}
+    expect:
+      rows:
+        - {location_id: 1, tax_rate: 0.0}
+
+  - name: ut_stg_locations_truncates_midday_open
+    description: "A midday opened_at timestamp truncates to its day."
+    model: stg_locations
+    given:
+      - input: source('ecom', 'raw_stores')
+        rows:
+          - {id: 1, name: "Store", tax_rate: 0.1, opened_at: "2021-06-15T12:30:00"}
+    expect:
+      rows:
+        - {location_id: 1, opened_date: "2021-06-15"}
+
+  - name: ut_stg_locations_truncates_leap_day
+    description: "A leap-day timestamp truncates correctly."
+    model: stg_locations
+    given:
+      - input: source('ecom', 'raw_stores')
+        rows:
+          - {id: 1, name: "Store", tax_rate: 0.1, opened_at: "2024-02-29T08:00:00"}
+    expect:
+      rows:
+        - {location_id: 1, opened_date: "2024-02-29"}
+
+  - name: ut_stg_locations_maps_all_columns
+    description: "All location columns map correctly in a single row."
+    model: stg_locations
+    given:
+      - input: source('ecom', 'raw_stores')
+        rows:
+          - {id: 3, name: "Vinewood", tax_rate: 0.095, opened_at: "2018-07-04T09:15:00"}
+    expect:
+      rows:
+        - {location_id: 3, location_name: "Vinewood", tax_rate: 0.095, opened_date: "2018-07-04"}
+
+  - name: ut_stg_locations_preserves_multiple_rows
+    description: "Each source store produces exactly one output row."
+    model: stg_locations
+    given:
+      - input: source('ecom', 'raw_stores')
+        rows:
+          - {id: 1, name: "A", tax_rate: 0.1, opened_at: "2020-01-01T00:00:00"}
+          - {id: 2, name: "B", tax_rate: 0.2, opened_at: "2021-01-01T00:00:00"}
+          - {id: 3, name: "C", tax_rate: 0.3, opened_at: "2022-01-01T00:00:00"}
+    expect:
+      rows:
+        - {location_id: 1, location_name: "A", tax_rate: 0.1, opened_date: "2020-01-01"}
+        - {location_id: 2, location_name: "B", tax_rate: 0.2, opened_date: "2021-01-01"}
+        - {location_id: 3, location_name: "C", tax_rate: 0.3, opened_date: "2022-01-01"}

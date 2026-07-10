@@ -1,0 +1,347 @@
+models:
+  - name: orders
+    description: Order overview data mart, offering key details for each order inlcluding if it's a customer's first order and a food vs. drink item breakdown. One row per order.
+    data_tests:
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "order_items_subtotal = subtotal"
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "order_total = subtotal + tax_paid"
+    columns:
+      - name: order_id
+        description: The unique key of the orders mart.
+        data_tests:
+          - not_null
+          - unique
+      - name: customer_id
+        description: The foreign key relating to the customer who placed the order.
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_customers')
+                field: customer_id
+      - name: order_total
+        description: The total amount of the order in USD including tax.
+      - name: ordered_at
+        description: The timestamp the order was placed at.
+      - name: order_cost
+        description: The sum of supply expenses to fulfill the order.
+      - name: gross_revenue
+        description: Order revenue before tax.
+      - name: gross_margin
+        description: Order revenue before tax minus the supply expenses to fulfill the order.
+      - name: is_food_order
+        description: A boolean indicating if this order included any food items.
+      - name: is_drink_order
+        description: A boolean indicating if this order included any drink items.
+
+unit_tests:
+  - name: test_order_items_compute_to_bools_correctly
+    description: "Test that the counts of drinks and food orders convert to booleans properly."
+    model: orders
+    given:
+      - input: ref('order_items')
+        rows:
+          - {order_id: 1, order_item_id: 1, is_drink_item: false, is_food_item: true}
+          - {order_id: 1, order_item_id: 2, is_drink_item: true, is_food_item: false}
+          - {order_id: 2, order_item_id: 3, is_drink_item: false, is_food_item: true}
+      - input: ref('stg_orders')
+        rows:
+          - {order_id: 1}
+          - {order_id: 2}
+    expect:
+      rows:
+        - {order_id: 1, count_food_items: 1, count_drink_items: 1, is_drink_order: true, is_food_order: true}
+        - {order_id: 2, count_food_items: 1, count_drink_items: 0, is_drink_order: false, is_food_order: true}
+
+  - name: ut_orders_order_cost_sums_supply_cost
+    description: "order_cost is the sum of the supply_cost of its order items."
+    model: orders
+    given:
+      - input: ref('stg_orders')
+        rows:
+          - {order_id: 1}
+      - input: ref('order_items')
+        rows:
+          - {order_id: 1, order_item_id: 1, supply_cost: 1.50}
+          - {order_id: 1, order_item_id: 2, supply_cost: 2.25}
+    expect:
+      rows:
+        - {order_id: 1, order_cost: 3.75}
+
+  - name: ut_orders_subtotal_sums_product_price
+    description: "order_items_subtotal is the sum of the product_price of its order items."
+    model: orders
+    given:
+      - input: ref('stg_orders')
+        rows:
+          - {order_id: 1}
+      - input: ref('order_items')
+        rows:
+          - {order_id: 1, order_item_id: 1, product_price: 6.00}
+          - {order_id: 1, order_item_id: 2, product_price: 4.00}
+    expect:
+      rows:
+        - {order_id: 1, order_items_subtotal: 10.00}
+
+  - name: ut_orders_gross_revenue_equals_subtotal
+    description: "gross_revenue mirrors order_items_subtotal."
+    model: orders
+    given:
+      - input: ref('stg_orders')
+        rows:
+          - {order_id: 1}
+      - input: ref('order_items')
+        rows:
+          - {order_id: 1, order_item_id: 1, product_price: 6.00}
+          - {order_id: 1, order_item_id: 2, product_price: 4.00}
+    expect:
+      rows:
+        - {order_id: 1, gross_revenue: 10.00}
+
+  - name: ut_orders_gross_margin_is_revenue_minus_cost
+    description: "gross_margin is order_items_subtotal minus order_cost."
+    model: orders
+    given:
+      - input: ref('stg_orders')
+        rows:
+          - {order_id: 1}
+      - input: ref('order_items')
+        rows:
+          - {order_id: 1, order_item_id: 1, product_price: 6.00, supply_cost: 2.00}
+          - {order_id: 1, order_item_id: 2, product_price: 4.00, supply_cost: 1.00}
+    expect:
+      rows:
+        - {order_id: 1, gross_revenue: 10.00, order_cost: 3.00, gross_margin: 7.00}
+
+  - name: ut_orders_counts_order_items
+    description: "count_order_items counts the order items in the order."
+    model: orders
+    given:
+      - input: ref('stg_orders')
+        rows:
+          - {order_id: 1}
+      - input: ref('order_items')
+        rows:
+          - {order_id: 1, order_item_id: 1}
+          - {order_id: 1, order_item_id: 2}
+          - {order_id: 1, order_item_id: 3}
+    expect:
+      rows:
+        - {order_id: 1, count_order_items: 3}
+
+  - name: ut_orders_food_only_order_flags
+    description: "An order with only food items is a food order and not a drink order."
+    model: orders
+    given:
+      - input: ref('stg_orders')
+        rows:
+          - {order_id: 1}
+      - input: ref('order_items')
+        rows:
+          - {order_id: 1, order_item_id: 1, is_food_item: true, is_drink_item: false}
+          - {order_id: 1, order_item_id: 2, is_food_item: true, is_drink_item: false}
+    expect:
+      rows:
+        - {order_id: 1, count_food_items: 2, count_drink_items: 0, is_food_order: true, is_drink_order: false}
+
+  - name: ut_orders_drink_only_order_flags
+    description: "An order with only drink items is a drink order and not a food order."
+    model: orders
+    given:
+      - input: ref('stg_orders')
+        rows:
+          - {order_id: 1}
+      - input: ref('order_items')
+        rows:
+          - {order_id: 1, order_item_id: 1, is_food_item: false, is_drink_item: true}
+    expect:
+      rows:
+        - {order_id: 1, count_food_items: 0, count_drink_items: 1, is_food_order: false, is_drink_order: true}
+
+  - name: ut_orders_customer_order_number_sequences_by_date
+    description: "customer_order_number increments by ordered_at within a customer."
+    model: orders
+    given:
+      - input: ref('order_items')
+        rows: []
+      - input: ref('stg_orders')
+        rows:
+          - {order_id: "O1", customer_id: "C1", ordered_at: "2024-01-01"}
+          - {order_id: "O2", customer_id: "C1", ordered_at: "2024-02-01"}
+          - {order_id: "O3", customer_id: "C1", ordered_at: "2024-03-01"}
+    expect:
+      rows:
+        - {order_id: "O1", customer_order_number: 1}
+        - {order_id: "O2", customer_order_number: 2}
+        - {order_id: "O3", customer_order_number: 3}
+
+  - name: ut_orders_customer_order_number_independent_per_customer
+    description: "Each customer's order numbering starts from 1 independently."
+    model: orders
+    given:
+      - input: ref('order_items')
+        rows: []
+      - input: ref('stg_orders')
+        rows:
+          - {order_id: "O1", customer_id: "C1", ordered_at: "2024-01-01"}
+          - {order_id: "O2", customer_id: "C2", ordered_at: "2024-01-02"}
+          - {order_id: "O3", customer_id: "C1", ordered_at: "2024-01-03"}
+    expect:
+      rows:
+        - {order_id: "O1", customer_order_number: 1}
+        - {order_id: "O2", customer_order_number: 1}
+        - {order_id: "O3", customer_order_number: 2}
+
+  - name: ut_orders_mixed_order_is_both_food_and_drink
+    description: "An order with both item types flags as both a food and drink order."
+    model: orders
+    given:
+      - input: ref('stg_orders')
+        rows:
+          - {order_id: 1}
+      - input: ref('order_items')
+        rows:
+          - {order_id: 1, order_item_id: 1, is_food_item: true, is_drink_item: false}
+          - {order_id: 1, order_item_id: 2, is_food_item: false, is_drink_item: true}
+    expect:
+      rows:
+        - {order_id: 1, is_food_order: true, is_drink_order: true}
+
+  - name: ut_orders_aggregates_orders_separately
+    description: "Item summaries are computed per order, not across orders."
+    model: orders
+    given:
+      - input: ref('stg_orders')
+        rows:
+          - {order_id: 1}
+          - {order_id: 2}
+      - input: ref('order_items')
+        rows:
+          - {order_id: 1, order_item_id: 1, product_price: 5.00, supply_cost: 2.00}
+          - {order_id: 2, order_item_id: 2, product_price: 8.00, supply_cost: 3.00}
+          - {order_id: 2, order_item_id: 3, product_price: 2.00, supply_cost: 1.00}
+    expect:
+      rows:
+        - {order_id: 1, order_items_subtotal: 5.00, order_cost: 2.00, count_order_items: 1}
+        - {order_id: 2, order_items_subtotal: 10.00, order_cost: 4.00, count_order_items: 2}
+
+semantic_models:
+  - name: orders
+    defaults:
+      agg_time_dimension: ordered_at
+    description: |
+      Order fact table. This table is at the order grain with one row per order.
+    model: ref('orders')
+    entities:
+      - name: order_id
+        type: primary
+      - name: location
+        type: foreign
+        expr: location_id
+      - name: customer
+        type: foreign
+        expr: customer_id
+    dimensions:
+      - name: ordered_at
+        expr: ordered_at
+        type: time
+        type_params:
+          time_granularity: day
+      - name: order_total_dim
+        type: categorical
+        expr: order_total
+      - name: is_food_order
+        type: categorical
+      - name: is_drink_order
+        type: categorical
+      - name: customer_order_number
+        type: categorical
+    measures:
+      - name: order_total
+        description: The total amount for each order including taxes.
+        agg: sum
+      - name: order_count
+        expr: 1
+        agg: sum
+      - name: tax_paid
+        description: The total tax paid on each order.
+        agg: sum
+      - name: order_cost
+        description: The cost for each order item. Cost is calculated as a sum of the supply cost for each order item.
+        agg: sum
+      - name: gross_revenue
+        description: Order revenue before tax.
+        agg: sum
+      - name: gross_margin
+        description: Order revenue before tax minus supply expenses.
+        agg: sum
+
+metrics:
+  - name: order_total
+    description: Sum of total order amonunt. Includes tax + revenue.
+    type: simple
+    label: Order Total
+    type_params:
+      measure: order_total
+  - name: gross_margin
+    description: Sum of order revenue before tax minus supply expenses.
+    type: simple
+    label: Gross Margin
+    type_params:
+      measure: gross_margin
+  - name: new_customer_orders
+    description: New customer's first order count
+    label: New Customers
+    type: simple
+    type_params:
+      measure: order_count
+    filter: |
+      {{ Dimension('order_id__customer_order_number') }} = 1
+  - name: large_orders
+    description: "Count of orders with order total over 20."
+    type: simple
+    label: Large Orders
+    type_params:
+      measure: order_count
+    filter: |
+      {{ Dimension('order_id__order_total_dim') }} >= 20
+  - name: orders
+    description: Count of orders.
+    label: Orders
+    type: simple
+    type_params:
+      measure: order_count
+  - name: food_orders
+    description: Count of orders that contain food order items
+    label: Food Orders
+    type: simple
+    type_params:
+      measure: order_count
+    filter: |
+      {{ Dimension('order_id__is_food_order') }} = true
+  - name: drink_orders
+    description: Count of orders that contain drink order items
+    label: Drink Orders
+    type: simple
+    type_params:
+      measure: order_count
+    filter: |
+      {{ Dimension('order_id__is_drink_order') }} = true
+
+saved_queries:
+  - name: order_metrics
+    query_params:
+      metrics:
+        - orders
+        - new_customer_orders
+        - order_total
+        - food_orders
+        - drink_orders
+      group_by:
+        - TimeDimension('metric_time', 'day')
+    exports:
+      - name: order_metrics
+        config:
+          export_as: table

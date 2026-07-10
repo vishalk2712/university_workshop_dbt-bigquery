@@ -1,0 +1,170 @@
+models:
+  - name: stg_products
+    description: Product (food and drink items that can be ordered) data with basic cleaning and transformation applied, one row per product.
+    columns:
+      - name: product_id
+        description: The unique key for each product.
+        data_tests:
+          - not_null
+          - unique
+
+unit_tests:
+  - name: ut_stg_products_renames_sku_to_product_id
+    description: "Source sku becomes product_id."
+    model: stg_products
+    given:
+      - input: source('ecom', 'raw_products')
+        rows:
+          - {sku: "JAF-01", name: "Nutellaphone", type: "jaffle"}
+    expect:
+      rows:
+        - {product_id: "JAF-01"}
+
+  - name: ut_stg_products_renames_name_to_product_name
+    description: "Source name becomes product_name."
+    model: stg_products
+    given:
+      - input: source('ecom', 'raw_products')
+        rows:
+          - {sku: "JAF-01", name: "Nutellaphone", type: "jaffle"}
+    expect:
+      rows:
+        - {product_id: "JAF-01", product_name: "Nutellaphone"}
+
+  - name: ut_stg_products_renames_type_to_product_type
+    description: "Source type becomes product_type."
+    model: stg_products
+    given:
+      - input: source('ecom', 'raw_products')
+        rows:
+          - {sku: "JAF-01", type: "jaffle"}
+    expect:
+      rows:
+        - {product_id: "JAF-01", product_type: "jaffle"}
+
+  - name: ut_stg_products_renames_description_to_product_description
+    description: "Source description becomes product_description."
+    model: stg_products
+    given:
+      - input: source('ecom', 'raw_products')
+        rows:
+          - {sku: "JAF-01", type: "jaffle", description: "A delicious jaffle"}
+    expect:
+      rows:
+        - {product_id: "JAF-01", product_description: "A delicious jaffle"}
+
+  - name: ut_stg_products_price_cents_to_dollars
+    description: "price in cents is converted to dollars."
+    model: stg_products
+    given:
+      - input: source('ecom', 'raw_products')
+        rows:
+          - {sku: "JAF-01", type: "jaffle", price: 1100}
+    expect:
+      rows:
+        - {product_id: "JAF-01", product_price: 11.00}
+
+  - name: ut_stg_products_price_odd_cents
+    description: "An odd cent price converts to an exact two-decimal value."
+    model: stg_products
+    given:
+      - input: source('ecom', 'raw_products')
+        rows:
+          - {sku: "JAF-01", type: "jaffle", price: 575}
+    expect:
+      rows:
+        - {product_id: "JAF-01", product_price: 5.75}
+
+  - name: ut_stg_products_jaffle_is_food_item
+    description: "A jaffle type product is flagged as a food item."
+    model: stg_products
+    given:
+      - input: source('ecom', 'raw_products')
+        rows:
+          - {sku: "JAF-01", type: "jaffle"}
+    expect:
+      rows:
+        - {product_id: "JAF-01", is_food_item: true, is_drink_item: false}
+
+  - name: ut_stg_products_beverage_is_drink_item
+    description: "A beverage type product is flagged as a drink item."
+    model: stg_products
+    given:
+      - input: source('ecom', 'raw_products')
+        rows:
+          - {sku: "BEV-01", type: "beverage"}
+    expect:
+      rows:
+        - {product_id: "BEV-01", is_food_item: false, is_drink_item: true}
+
+  - name: ut_stg_products_unknown_type_is_neither
+    description: "An unrecognized type is neither food nor drink."
+    model: stg_products
+    given:
+      - input: source('ecom', 'raw_products')
+        rows:
+          - {sku: "MISC-01", type: "merch"}
+    expect:
+      rows:
+        - {product_id: "MISC-01", is_food_item: false, is_drink_item: false}
+
+  - name: ut_stg_products_null_type_coalesces_to_false
+    description: "A null type coalesces both boolean flags to false rather than null."
+    model: stg_products
+    given:
+      - input: source('ecom', 'raw_products')
+        rows:
+          - {sku: "NULL-01", type: null}
+    expect:
+      rows:
+        - {product_id: "NULL-01", is_food_item: false, is_drink_item: false}
+
+  - name: ut_stg_products_type_is_case_sensitive
+    description: "Type matching is case sensitive, so 'Jaffle' is not a food item."
+    model: stg_products
+    given:
+      - input: source('ecom', 'raw_products')
+        rows:
+          - {sku: "CASE-01", type: "Jaffle"}
+    expect:
+      rows:
+        - {product_id: "CASE-01", is_food_item: false, is_drink_item: false}
+
+  - name: ut_stg_products_food_and_drink_are_mutually_exclusive
+    description: "A product is never both a food and a drink item."
+    model: stg_products
+    given:
+      - input: source('ecom', 'raw_products')
+        rows:
+          - {sku: "JAF-01", type: "jaffle"}
+          - {sku: "BEV-01", type: "beverage"}
+    expect:
+      rows:
+        - {product_id: "JAF-01", is_food_item: true, is_drink_item: false}
+        - {product_id: "BEV-01", is_food_item: false, is_drink_item: true}
+
+  - name: ut_stg_products_maps_all_columns
+    description: "All product columns map correctly in a single row."
+    model: stg_products
+    given:
+      - input: source('ecom', 'raw_products')
+        rows:
+          - {sku: "JAF-01", name: "Doombar", type: "jaffle", description: "Tasty", price: 900}
+    expect:
+      rows:
+        - {product_id: "JAF-01", product_name: "Doombar", product_type: "jaffle", product_description: "Tasty", product_price: 9.00, is_food_item: true, is_drink_item: false}
+
+  - name: ut_stg_products_preserves_multiple_rows
+    description: "Each source product produces exactly one output row."
+    model: stg_products
+    given:
+      - input: source('ecom', 'raw_products')
+        rows:
+          - {sku: "P1", type: "jaffle", price: 1000}
+          - {sku: "P2", type: "beverage", price: 200}
+          - {sku: "P3", type: "merch", price: 1500}
+    expect:
+      rows:
+        - {product_id: "P1", product_price: 10.00, is_food_item: true, is_drink_item: false}
+        - {product_id: "P2", product_price: 2.00, is_food_item: false, is_drink_item: true}
+        - {product_id: "P3", product_price: 15.00, is_food_item: false, is_drink_item: false}

@@ -1,0 +1,86 @@
+unit_tests:
+  - name: ut_products_passes_through_product_id
+    description: "product_id flows through unchanged from stg_products."
+    model: products
+    given:
+      - input: ref('stg_products')
+        rows:
+          - {product_id: "P1"}
+    expect:
+      rows:
+        - {product_id: "P1"}
+
+  - name: ut_products_passes_through_price
+    description: "product_price flows through unchanged from stg_products."
+    model: products
+    given:
+      - input: ref('stg_products')
+        rows:
+          - {product_id: "P1", product_price: 9.99}
+    expect:
+      rows:
+        - {product_id: "P1", product_price: 9.99}
+
+  - name: ut_products_passes_through_food_flag
+    description: "is_food_item flows through unchanged from stg_products."
+    model: products
+    given:
+      - input: ref('stg_products')
+        rows:
+          - {product_id: "P1", is_food_item: true, is_drink_item: false}
+    expect:
+      rows:
+        - {product_id: "P1", is_food_item: true, is_drink_item: false}
+
+  - name: ut_products_passes_through_all_attributes
+    description: "All product attributes flow through unchanged."
+    model: products
+    given:
+      - input: ref('stg_products')
+        rows:
+          - {product_id: "P1", product_name: "Jaffle", product_type: "jaffle", product_description: "Yum", product_price: 11.00, is_food_item: true, is_drink_item: false}
+    expect:
+      rows:
+        - {product_id: "P1", product_name: "Jaffle", product_type: "jaffle", product_description: "Yum", product_price: 11.00, is_food_item: true, is_drink_item: false}
+
+  - name: ut_products_preserves_multiple_rows
+    description: "Every staging row produces exactly one mart row."
+    model: products
+    given:
+      - input: ref('stg_products')
+        rows:
+          - {product_id: "P1"}
+          - {product_id: "P2"}
+          - {product_id: "P3"}
+    expect:
+      rows:
+        - {product_id: "P1"}
+        - {product_id: "P2"}
+        - {product_id: "P3"}
+
+semantic_models:
+  #The name of the semantic model.
+  - name: products
+    description: |
+      Product dimension table. The grain of the table is one row per product.
+    #The name of the dbt model and schema
+    model: ref('products')
+    #Entities. These usually corespond to keys in the table.
+    entities:
+      - name: product
+        type: primary
+        expr: product_id
+    #Dimensions. Either categorical or time. These add additonal context to metrics. The typical querying pattern is Metric by Dimension.
+    dimensions:
+      - name: product_name
+        type: categorical
+      - name: product_type
+        type: categorical
+      - name: product_description
+        type: categorical
+      - name: is_food_item
+        type: categorical
+      - name: is_drink_item
+        type: categorical
+      - name: product_price
+        type: categorical

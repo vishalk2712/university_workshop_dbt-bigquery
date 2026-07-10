@@ -1,0 +1,125 @@
+models:
+  - name: stg_order_items
+    description: Individual food and drink items that make up our orders, one row per item.
+    columns:
+      - name: order_item_id
+        description: The unique key for each order item.
+        data_tests:
+          - not_null
+          - unique
+      - name: order_id
+        description: The corresponding order each order item belongs to
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_orders')
+                field: order_id
+
+unit_tests:
+  - name: ut_stg_order_items_renames_id_to_order_item_id
+    description: "Source id becomes order_item_id."
+    model: stg_order_items
+    given:
+      - input: source('ecom', 'raw_items')
+        rows:
+          - {id: "OI1", order_id: "O1", sku: "SKU1"}
+    expect:
+      rows:
+        - {order_item_id: "OI1"}
+
+  - name: ut_stg_order_items_renames_sku_to_product_id
+    description: "Source sku becomes product_id."
+    model: stg_order_items
+    given:
+      - input: source('ecom', 'raw_items')
+        rows:
+          - {id: "OI1", order_id: "O1", sku: "SKU1"}
+    expect:
+      rows:
+        - {product_id: "SKU1"}
+
+  - name: ut_stg_order_items_passes_through_order_id
+    description: "order_id is carried through unchanged."
+    model: stg_order_items
+    given:
+      - input: source('ecom', 'raw_items')
+        rows:
+          - {id: "OI1", order_id: "O99", sku: "SKU1"}
+    expect:
+      rows:
+        - {order_id: "O99"}
+
+  - name: ut_stg_order_items_maps_all_columns
+    description: "All three columns map in a single row."
+    model: stg_order_items
+    given:
+      - input: source('ecom', 'raw_items')
+        rows:
+          - {id: "OI1", order_id: "O1", sku: "SKU42"}
+    expect:
+      rows:
+        - {order_item_id: "OI1", order_id: "O1", product_id: "SKU42"}
+
+  - name: ut_stg_order_items_preserves_multiple_rows
+    description: "Each source item produces one output row."
+    model: stg_order_items
+    given:
+      - input: source('ecom', 'raw_items')
+        rows:
+          - {id: "OI1", order_id: "O1", sku: "SKU1"}
+          - {id: "OI2", order_id: "O1", sku: "SKU2"}
+          - {id: "OI3", order_id: "O2", sku: "SKU1"}
+    expect:
+      rows:
+        - {order_item_id: "OI1", order_id: "O1", product_id: "SKU1"}
+        - {order_item_id: "OI2", order_id: "O1", product_id: "SKU2"}
+        - {order_item_id: "OI3", order_id: "O2", product_id: "SKU1"}
+
+  - name: ut_stg_order_items_allows_repeated_product_in_order
+    description: "The same product can appear multiple times within an order."
+    model: stg_order_items
+    given:
+      - input: source('ecom', 'raw_items')
+        rows:
+          - {id: "OI1", order_id: "O1", sku: "SKU1"}
+          - {id: "OI2", order_id: "O1", sku: "SKU1"}
+    expect:
+      rows:
+        - {order_item_id: "OI1", order_id: "O1", product_id: "SKU1"}
+        - {order_item_id: "OI2", order_id: "O1", product_id: "SKU1"}
+
+  - name: ut_stg_order_items_handles_null_product_id
+    description: "A null sku passes through as a null product_id."
+    model: stg_order_items
+    given:
+      - input: source('ecom', 'raw_items')
+        rows:
+          - {id: "OI1", order_id: "O1", sku: null}
+    expect:
+      rows:
+        - {order_item_id: "OI1", order_id: "O1", product_id: null}
+
+  - name: ut_stg_order_items_handles_single_row
+    description: "A single source item yields a single output row."
+    model: stg_order_items
+    given:
+      - input: source('ecom', 'raw_items')
+        rows:
+          - {id: "solo", order_id: "O1", sku: "SKU1"}
+    expect:
+      rows:
+        - {order_item_id: "solo", order_id: "O1", product_id: "SKU1"}
+
+  - name: ut_stg_order_items_preserves_distinct_item_ids
+    description: "Distinct order_item_ids are kept separate even with identical order/product."
+    model: stg_order_items
+    given:
+      - input: source('ecom', 'raw_items')
+        rows:
+          - {id: "A", order_id: "O1", sku: "SKU1"}
+          - {id: "B", order_id: "O1", sku: "SKU1"}
+    expect:
+      rows:
+        - {order_item_id: "A", order_id: "O1", product_id: "SKU1"}
+        - {order_item_id: "B", order_id: "O1", product_id: "SKU1"}

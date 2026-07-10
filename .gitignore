@@ -1,0 +1,17 @@
+.venv
+venv
+.env
+env
+
+target/
+dbt_packages/
+logs/
+profiles.yml
+
+.DS_Store
+
+.user.yml
+
+.ruff_cache
+__pycache__
+dbt_internal_packages/

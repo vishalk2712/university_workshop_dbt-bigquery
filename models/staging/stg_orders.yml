@@ -1,0 +1,172 @@
+models:
+  - name: stg_orders
+    description: Order data with basic cleaning and transformation applied, one row per order.
+    data_tests:
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "order_total - tax_paid = subtotal"
+    columns:
+      - name: order_id
+        description: The unique key for each order.
+        data_tests:
+          - not_null
+          - unique
+
+unit_tests:
+  - name: ut_stg_orders_renames_id_to_order_id
+    description: "Source id becomes order_id."
+    model: stg_orders
+    given:
+      - input: source('ecom', 'raw_orders')
+        rows:
+          - {id: "O1", store_id: "S1", customer: "C1"}
+    expect:
+      rows:
+        - {order_id: "O1"}
+
+  - name: ut_stg_orders_renames_store_id_to_location_id
+    description: "Source store_id becomes location_id."
+    model: stg_orders
+    given:
+      - input: source('ecom', 'raw_orders')
+        rows:
+          - {id: "O1", store_id: "S9", customer: "C1"}
+    expect:
+      rows:
+        - {location_id: "S9"}
+
+  - name: ut_stg_orders_renames_customer_to_customer_id
+    description: "Source customer becomes customer_id."
+    model: stg_orders
+    given:
+      - input: source('ecom', 'raw_orders')
+        rows:
+          - {id: "O1", store_id: "S1", customer: "C7"}
+    expect:
+      rows:
+        - {customer_id: "C7"}
+
+  - name: ut_stg_orders_subtotal_cents_to_dollars
+    description: "subtotal in cents is converted to dollars."
+    model: stg_orders
+    given:
+      - input: source('ecom', 'raw_orders')
+        rows:
+          - {id: "O1", subtotal: 1000}
+    expect:
+      rows:
+        - {order_id: "O1", subtotal: 10.00}
+
+  - name: ut_stg_orders_tax_paid_cents_to_dollars
+    description: "tax_paid in cents is converted to dollars."
+    model: stg_orders
+    given:
+      - input: source('ecom', 'raw_orders')
+        rows:
+          - {id: "O1", tax_paid: 80}
+    expect:
+      rows:
+        - {order_id: "O1", tax_paid: 0.80}
+
+  - name: ut_stg_orders_order_total_cents_to_dollars
+    description: "order_total in cents is converted to dollars."
+    model: stg_orders
+    given:
+      - input: source('ecom', 'raw_orders')
+        rows:
+          - {id: "O1", order_total: 1080}
+    expect:
+      rows:
+        - {order_id: "O1", order_total: 10.80}
+
+  - name: ut_stg_orders_preserves_subtotal_cents
+    description: "The raw cents value is retained as subtotal_cents."
+    model: stg_orders
+    given:
+      - input: source('ecom', 'raw_orders')
+        rows:
+          - {id: "O1", subtotal: 1299}
+    expect:
+      rows:
+        - {order_id: "O1", subtotal_cents: 1299, subtotal: 12.99}
+
+  - name: ut_stg_orders_preserves_tax_paid_cents
+    description: "The raw cents value is retained as tax_paid_cents."
+    model: stg_orders
+    given:
+      - input: source('ecom', 'raw_orders')
+        rows:
+          - {id: "O1", tax_paid: 104}
+    expect:
+      rows:
+        - {order_id: "O1", tax_paid_cents: 104, tax_paid: 1.04}
+
+  - name: ut_stg_orders_preserves_order_total_cents
+    description: "The raw cents value is retained as order_total_cents."
+    model: stg_orders
+    given:
+      - input: source('ecom', 'raw_orders')
+        rows:
+          - {id: "O1", order_total: 2000}
+    expect:
+      rows:
+        - {order_id: "O1", order_total_cents: 2000, order_total: 20.00}
+
+  - name: ut_stg_orders_cents_conversion_rounds_to_two_decimals
+    description: "Odd cent amounts convert to exact two-decimal dollar values."
+    model: stg_orders
+    given:
+      - input: source('ecom', 'raw_orders')
+        rows:
+          - {id: "O1", subtotal: 599, tax_paid: 48, order_total: 647}
+    expect:
+      rows:
+        - {order_id: "O1", subtotal: 5.99, tax_paid: 0.48, order_total: 6.47}
+
+  - name: ut_stg_orders_handles_zero_amounts
+    description: "Zero-cent amounts convert to 0.00 dollars."
+    model: stg_orders
+    given:
+      - input: source('ecom', 'raw_orders')
+        rows:
+          - {id: "O1", subtotal: 0, tax_paid: 0, order_total: 0}
+    expect:
+      rows:
+        - {order_id: "O1", subtotal: 0.00, tax_paid: 0.00, order_total: 0.00}
+
+  - name: ut_stg_orders_truncates_ordered_at_to_day
+    description: "ordered_at timestamp is truncated to the day."
+    model: stg_orders
+    given:
+      - input: source('ecom', 'raw_orders')
+        rows:
+          - {id: "O1", ordered_at: "2024-03-15T14:32:10"}
+    expect:
+      rows:
+        - {order_id: "O1", ordered_at: "2024-03-15"}
+
+  - name: ut_stg_orders_truncates_end_of_day_timestamp
+    description: "An end-of-day timestamp still truncates down to that day."
+    model: stg_orders
+    given:
+      - input: source('ecom', 'raw_orders')
+        rows:
+          - {id: "O1", ordered_at: "2024-12-31T23:59:59"}
+    expect:
+      rows:
+        - {order_id: "O1", ordered_at: "2024-12-31"}
+
+  - name: ut_stg_orders_preserves_multiple_rows
+    description: "Each source order produces exactly one output row."
+    model: stg_orders
+    given:
+      - input: source('ecom', 'raw_orders')
+        rows:
+          - {id: "O1", subtotal: 500}
+          - {id: "O2", subtotal: 700}
+          - {id: "O3", subtotal: 350}
+    expect:
+      rows:
+        - {order_id: "O1", subtotal: 5.00}
+        - {order_id: "O2", subtotal: 7.00}
+        - {order_id: "O3", subtotal: 3.50}

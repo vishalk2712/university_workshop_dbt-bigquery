@@ -1,0 +1,115 @@
+models:
+  - name: stg_customers
+    description: Customer data with basic cleaning and transformation applied, one row per customer.
+    columns:
+      - name: customer_id
+        description: The unique key for each customer.
+        data_tests:
+          - not_null
+          - unique
+
+unit_tests:
+  - name: ut_stg_customers_renames_id_to_customer_id
+    description: "id from the source is exposed as customer_id."
+    model: stg_customers
+    given:
+      - input: source('ecom', 'raw_customers')
+        rows:
+          - {id: "C001", name: "Alice"}
+    expect:
+      rows:
+        - {customer_id: "C001"}
+
+  - name: ut_stg_customers_renames_name_to_customer_name
+    description: "name from the source is exposed as customer_name."
+    model: stg_customers
+    given:
+      - input: source('ecom', 'raw_customers')
+        rows:
+          - {id: "C001", name: "Alice"}
+    expect:
+      rows:
+        - {customer_name: "Alice"}
+
+  - name: ut_stg_customers_maps_both_columns_together
+    description: "Both id and name map to their renamed columns in one row."
+    model: stg_customers
+    given:
+      - input: source('ecom', 'raw_customers')
+        rows:
+          - {id: "C042", name: "Bob"}
+    expect:
+      rows:
+        - {customer_id: "C042", customer_name: "Bob"}
+
+  - name: ut_stg_customers_preserves_multiple_rows
+    description: "Every source row produces exactly one output row (passthrough grain)."
+    model: stg_customers
+    given:
+      - input: source('ecom', 'raw_customers')
+        rows:
+          - {id: "C1", name: "Alice"}
+          - {id: "C2", name: "Bob"}
+          - {id: "C3", name: "Carol"}
+    expect:
+      rows:
+        - {customer_id: "C1", customer_name: "Alice"}
+        - {customer_id: "C2", customer_name: "Bob"}
+        - {customer_id: "C3", customer_name: "Carol"}
+
+  - name: ut_stg_customers_handles_null_name
+    description: "A null source name passes through as a null customer_name."
+    model: stg_customers
+    given:
+      - input: source('ecom', 'raw_customers')
+        rows:
+          - {id: "C1", name: null}
+    expect:
+      rows:
+        - {customer_id: "C1", customer_name: null}
+
+  - name: ut_stg_customers_preserves_distinct_ids
+    description: "Distinct customer ids are not collapsed."
+    model: stg_customers
+    given:
+      - input: source('ecom', 'raw_customers')
+        rows:
+          - {id: "A", name: "Same Name"}
+          - {id: "B", name: "Same Name"}
+    expect:
+      rows:
+        - {customer_id: "A", customer_name: "Same Name"}
+        - {customer_id: "B", customer_name: "Same Name"}
+
+  - name: ut_stg_customers_preserves_special_characters
+    description: "Names with punctuation and spaces are preserved verbatim."
+    model: stg_customers
+    given:
+      - input: source('ecom', 'raw_customers')
+        rows:
+          - {id: "C1", name: "O'Brien, Jr."}
+    expect:
+      rows:
+        - {customer_id: "C1", customer_name: "O'Brien, Jr."}
+
+  - name: ut_stg_customers_preserves_unicode_name
+    description: "Unicode characters in names survive the transformation."
+    model: stg_customers
+    given:
+      - input: source('ecom', 'raw_customers')
+        rows:
+          - {id: "C1", name: "José Núñez"}
+    expect:
+      rows:
+        - {customer_id: "C1", customer_name: "José Núñez"}
+
+  - name: ut_stg_customers_handles_single_row
+    description: "A single source row yields a single output row."
+    model: stg_customers
+    given:
+      - input: source('ecom', 'raw_customers')
+        rows:
+          - {id: "solo", name: "Only Customer"}
+    expect:
+      rows:
+        - {customer_id: "solo", customer_name: "Only Customer"}

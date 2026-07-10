@@ -1,0 +1,289 @@
+models:
+  - name: customers
+    description: Customer overview data mart, offering key details for each unique customer. One row per customer.
+    data_tests:
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "lifetime_spend_pretax + lifetime_tax_paid = lifetime_spend"
+    columns:
+      - name: customer_id
+        description: The unique key of the orders mart.
+        data_tests:
+          - not_null
+          - unique
+      - name: customer_name
+        description: Customers' full name.
+      - name: count_lifetime_orders
+        description: Total number of orders a customer has ever placed.
+      - name: first_ordered_at
+        description: The timestamp when a customer placed their first order.
+      - name: last_ordered_at
+        description: The timestamp of a customer's most recent order.
+      - name: lifetime_spend_pretax
+        description: The sum of all the pre-tax subtotals of every order a customer has placed.
+      - name: lifetime_tax_paid
+        description: The sum of all the tax portion of every order a customer has placed.
+      - name: lifetime_spend
+        description: The sum of all the order totals (including tax) that a customer has ever placed.
+      - name: customer_type
+        description: Options are 'new' or 'returning', indicating if a customer has ordered more than once or has only placed their first order to date.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ["new", "returning"]
+
+unit_tests:
+  - name: ut_customers_single_order_is_new
+    description: "A customer with exactly one order is classified as 'new'."
+    model: customers
+    given:
+      - input: ref('stg_customers')
+        rows:
+          - {customer_id: "C1", customer_name: "Alice"}
+      - input: ref('orders')
+        rows:
+          - {customer_id: "C1", order_id: "O1", ordered_at: "2024-01-01", subtotal: 10.00, tax_paid: 1.00, order_total: 11.00}
+    expect:
+      rows:
+        - {customer_id: "C1", count_lifetime_orders: 1, customer_type: "new"}
+
+  - name: ut_customers_two_orders_is_returning
+    description: "A customer with more than one order is classified as 'returning'."
+    model: customers
+    given:
+      - input: ref('stg_customers')
+        rows:
+          - {customer_id: "C1", customer_name: "Alice"}
+      - input: ref('orders')
+        rows:
+          - {customer_id: "C1", order_id: "O1", ordered_at: "2024-01-01", subtotal: 10.00, tax_paid: 1.00, order_total: 11.00}
+          - {customer_id: "C1", order_id: "O2", ordered_at: "2024-02-01", subtotal: 20.00, tax_paid: 2.00, order_total: 22.00}
+    expect:
+      rows:
+        - {customer_id: "C1", count_lifetime_orders: 2, customer_type: "returning"}
+
+  - name: ut_customers_no_orders_is_new
+    description: "A customer with no orders is classified as 'new' with no lifetime order count."
+    model: customers
+    given:
+      - input: ref('stg_customers')
+        rows:
+          - {customer_id: "C1", customer_name: "Alice"}
+      - input: ref('orders')
+        rows: []
+    expect:
+      rows:
+        - {customer_id: "C1", customer_name: "Alice", count_lifetime_orders: null, customer_type: "new"}
+
+  - name: ut_customers_lifetime_spend_pretax_sums
+    description: "lifetime_spend_pretax is the sum of order subtotals."
+    model: customers
+    given:
+      - input: ref('stg_customers')
+        rows:
+          - {customer_id: "C1", customer_name: "Alice"}
+      - input: ref('orders')
+        rows:
+          - {customer_id: "C1", order_id: "O1", ordered_at: "2024-01-01", subtotal: 10.00, tax_paid: 1.00, order_total: 11.00}
+          - {customer_id: "C1", order_id: "O2", ordered_at: "2024-02-01", subtotal: 15.00, tax_paid: 1.50, order_total: 16.50}
+    expect:
+      rows:
+        - {customer_id: "C1", lifetime_spend_pretax: 25.00}
+
+  - name: ut_customers_lifetime_tax_paid_sums
+    description: "lifetime_tax_paid is the sum of order tax amounts."
+    model: customers
+    given:
+      - input: ref('stg_customers')
+        rows:
+          - {customer_id: "C1", customer_name: "Alice"}
+      - input: ref('orders')
+        rows:
+          - {customer_id: "C1", order_id: "O1", ordered_at: "2024-01-01", subtotal: 10.00, tax_paid: 1.00, order_total: 11.00}
+          - {customer_id: "C1", order_id: "O2", ordered_at: "2024-02-01", subtotal: 15.00, tax_paid: 1.50, order_total: 16.50}
+    expect:
+      rows:
+        - {customer_id: "C1", lifetime_tax_paid: 2.50}
+
+  - name: ut_customers_lifetime_spend_sums
+    description: "lifetime_spend is the sum of order totals including tax."
+    model: customers
+    given:
+      - input: ref('stg_customers')
+        rows:
+          - {customer_id: "C1", customer_name: "Alice"}
+      - input: ref('orders')
+        rows:
+          - {customer_id: "C1", order_id: "O1", ordered_at: "2024-01-01", subtotal: 10.00, tax_paid: 1.00, order_total: 11.00}
+          - {customer_id: "C1", order_id: "O2", ordered_at: "2024-02-01", subtotal: 15.00, tax_paid: 1.50, order_total: 16.50}
+    expect:
+      rows:
+        - {customer_id: "C1", lifetime_spend: 27.50}
+
+  - name: ut_customers_first_ordered_at_is_min
+    description: "first_ordered_at is the earliest order date."
+    model: customers
+    given:
+      - input: ref('stg_customers')
+        rows:
+          - {customer_id: "C1", customer_name: "Alice"}
+      - input: ref('orders')
+        rows:
+          - {customer_id: "C1", order_id: "O1", ordered_at: "2024-03-01", subtotal: 10.00, tax_paid: 1.00, order_total: 11.00}
+          - {customer_id: "C1", order_id: "O2", ordered_at: "2024-01-15", subtotal: 10.00, tax_paid: 1.00, order_total: 11.00}
+    expect:
+      rows:
+        - {customer_id: "C1", first_ordered_at: "2024-01-15"}
+
+  - name: ut_customers_last_ordered_at_is_max
+    description: "last_ordered_at is the most recent order date."
+    model: customers
+    given:
+      - input: ref('stg_customers')
+        rows:
+          - {customer_id: "C1", customer_name: "Alice"}
+      - input: ref('orders')
+        rows:
+          - {customer_id: "C1", order_id: "O1", ordered_at: "2024-03-01", subtotal: 10.00, tax_paid: 1.00, order_total: 11.00}
+          - {customer_id: "C1", order_id: "O2", ordered_at: "2024-01-15", subtotal: 10.00, tax_paid: 1.00, order_total: 11.00}
+    expect:
+      rows:
+        - {customer_id: "C1", last_ordered_at: "2024-03-01"}
+
+  - name: ut_customers_passes_through_customer_name
+    description: "customer_name from stg_customers is preserved on the mart."
+    model: customers
+    given:
+      - input: ref('stg_customers')
+        rows:
+          - {customer_id: "C1", customer_name: "Grace Hopper"}
+      - input: ref('orders')
+        rows: []
+    expect:
+      rows:
+        - {customer_id: "C1", customer_name: "Grace Hopper"}
+
+  - name: ut_customers_three_orders_is_returning
+    description: "A customer with three orders is 'returning' with a count of 3."
+    model: customers
+    given:
+      - input: ref('stg_customers')
+        rows:
+          - {customer_id: "C1", customer_name: "Alice"}
+      - input: ref('orders')
+        rows:
+          - {customer_id: "C1", order_id: "O1", ordered_at: "2024-01-01", subtotal: 5.00, tax_paid: 0.50, order_total: 5.50}
+          - {customer_id: "C1", order_id: "O2", ordered_at: "2024-02-01", subtotal: 5.00, tax_paid: 0.50, order_total: 5.50}
+          - {customer_id: "C1", order_id: "O3", ordered_at: "2024-03-01", subtotal: 5.00, tax_paid: 0.50, order_total: 5.50}
+    expect:
+      rows:
+        - {customer_id: "C1", count_lifetime_orders: 3, customer_type: "returning"}
+
+  - name: ut_customers_separates_multiple_customers
+    description: "Each customer is summarized independently."
+    model: customers
+    given:
+      - input: ref('stg_customers')
+        rows:
+          - {customer_id: "C1", customer_name: "Alice"}
+          - {customer_id: "C2", customer_name: "Bob"}
+      - input: ref('orders')
+        rows:
+          - {customer_id: "C1", order_id: "O1", ordered_at: "2024-01-01", subtotal: 10.00, tax_paid: 1.00, order_total: 11.00}
+          - {customer_id: "C2", order_id: "O2", ordered_at: "2024-01-02", subtotal: 20.00, tax_paid: 2.00, order_total: 22.00}
+          - {customer_id: "C2", order_id: "O3", ordered_at: "2024-01-03", subtotal: 30.00, tax_paid: 3.00, order_total: 33.00}
+    expect:
+      rows:
+        - {customer_id: "C1", count_lifetime_orders: 1, lifetime_spend: 11.00, customer_type: "new"}
+        - {customer_id: "C2", count_lifetime_orders: 2, lifetime_spend: 55.00, customer_type: "returning"}
+
+  - name: ut_customers_counts_orders_distinctly
+    description: "count_lifetime_orders counts distinct order ids."
+    model: customers
+    given:
+      - input: ref('stg_customers')
+        rows:
+          - {customer_id: "C1", customer_name: "Alice"}
+      - input: ref('orders')
+        rows:
+          - {customer_id: "C1", order_id: "O1", ordered_at: "2024-01-01", subtotal: 10.00, tax_paid: 1.00, order_total: 11.00}
+          - {customer_id: "C1", order_id: "O2", ordered_at: "2024-01-02", subtotal: 10.00, tax_paid: 1.00, order_total: 11.00}
+    expect:
+      rows:
+        - {customer_id: "C1", count_lifetime_orders: 2}
+
+semantic_models:
+  - name: customers
+    defaults:
+      agg_time_dimension: first_ordered_at
+    description: |
+      Customer grain mart.
+    model: ref('customers')
+    entities:
+      - name: customer
+        expr: customer_id
+        type: primary
+    dimensions:
+      - name: customer_name
+        type: categorical
+      - name: customer_type
+        type: categorical
+      - name: first_ordered_at
+        type: time
+        type_params:
+          time_granularity: day
+      - name: last_ordered_at
+        type: time
+        type_params:
+          time_granularity: day
+    measures:
+      - name: customers
+        description: Count of unique customers
+        agg: count_distinct
+        expr: customer_id
+      - name: count_lifetime_orders
+        description: Total count of orders per customer.
+        agg: sum
+      - name: lifetime_spend_pretax
+        description: Customer lifetime spend before taxes.
+        agg: sum
+      - name: lifetime_spend
+        agg: sum
+        description: Gross customer lifetime spend inclusive of taxes.
+
+metrics:
+  - name: lifetime_spend_pretax
+    description: Customer's lifetime spend before tax
+    label: LTV Pre-tax
+    type: simple
+    type_params:
+      measure: lifetime_spend_pretax
+  - name: count_lifetime_orders
+    description: Count of lifetime orders
+    label: Count Lifetime Orders
+    type: simple
+    type_params:
+      measure: count_lifetime_orders
+  - name: average_order_value
+    description: LTV pre-tax / number of orders
+    label: Average Order Value
+    type: derived
+    type_params:
+      metrics:
+        - count_lifetime_orders
+        - lifetime_spend_pretax
+      expr: lifetime_spend_pretax / count_lifetime_orders
+
+saved_queries:
+  - name: customer_order_metrics
+    query_params:
+      metrics:
+        - count_lifetime_orders
+        - lifetime_spend_pretax
+        - average_order_value
+      group_by:
+        - Entity('customer')
+    exports:
+      - name: customer_order_metrics
+        config:
+          export_as: table

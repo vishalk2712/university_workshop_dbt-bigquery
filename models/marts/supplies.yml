@@ -1,0 +1,82 @@
+unit_tests:
+  - name: ut_supplies_passes_through_supply_id
+    description: "supply_id flows through unchanged from stg_supplies."
+    model: supplies
+    given:
+      - input: ref('stg_supplies')
+        rows:
+          - {supply_uuid: "u1", supply_id: "SUP1"}
+    expect:
+      rows:
+        - {supply_id: "SUP1"}
+
+  - name: ut_supplies_passes_through_product_id
+    description: "product_id flows through unchanged from stg_supplies."
+    model: supplies
+    given:
+      - input: ref('stg_supplies')
+        rows:
+          - {supply_uuid: "u1", product_id: "SKU1"}
+    expect:
+      rows:
+        - {product_id: "SKU1"}
+
+  - name: ut_supplies_passes_through_supply_cost
+    description: "supply_cost flows through unchanged from stg_supplies."
+    model: supplies
+    given:
+      - input: ref('stg_supplies')
+        rows:
+          - {supply_uuid: "u1", supply_cost: 4.50}
+    expect:
+      rows:
+        - {supply_cost: 4.50}
+
+  - name: ut_supplies_passes_through_perishable_flag
+    description: "is_perishable_supply flows through unchanged from stg_supplies."
+    model: supplies
+    given:
+      - input: ref('stg_supplies')
+        rows:
+          - {supply_uuid: "u1", is_perishable_supply: true}
+    expect:
+      rows:
+        - {is_perishable_supply: true}
+
+  - name: ut_supplies_preserves_multiple_rows
+    description: "Every staging row produces exactly one mart row."
+    model: supplies
+    given:
+      - input: ref('stg_supplies')
+        rows:
+          - {supply_uuid: "u1", supply_id: "SUP1"}
+          - {supply_uuid: "u2", supply_id: "SUP2"}
+    expect:
+      rows:
+        - {supply_id: "SUP1"}
+        - {supply_id: "SUP2"}
+
+semantic_models:
+  #The name of the semantic model.
+  - name: supplies
+    description: |
+      Supplies dimension table. The grain of the table is one row per supply and product combination.
+    #The name of the dbt model and schema
+    model: ref('supplies')
+    #Entities. These usually corespond to keys in the table.
+    entities:
+      - name: supply
+        type: primary
+        expr: supply_uuid
+    #Dimensions. Either categorical or time. These add additonal context to metrics. The typical querying pattern is Metric by Dimension.
+    dimensions:
+      - name: supply_id
+        type: categorical
+      - name: product_id
+        type: categorical
+      - name: supply_name
+        type: categorical
+      - name: supply_cost
+        type: categorical
+      - name: is_perishable_supply
+        type: categorical

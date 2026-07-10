@@ -1,0 +1,114 @@
+models:
+  - name: stg_supplies
+    description: >
+      List of our supply expenses data with basic cleaning and transformation applied.
+
+      One row per supply cost, not per supply. As supply costs fluctuate they receive a new row with a new UUID. Thus there can be multiple rows per supply_id.
+    columns:
+      - name: supply_uuid
+        description: The unique key of our supplies per cost.
+        data_tests:
+          - not_null
+          - unique
+
+unit_tests:
+  - name: ut_stg_supplies_renames_id_to_supply_id
+    description: "Source id becomes supply_id."
+    model: stg_supplies
+    given:
+      - input: source('ecom', 'raw_supplies')
+        rows:
+          - {id: "SUP1", sku: "SKU1", name: "Flour", cost: 100, perishable: false}
+    expect:
+      rows:
+        - {supply_id: "SUP1"}
+
+  - name: ut_stg_supplies_renames_sku_to_product_id
+    description: "Source sku becomes product_id."
+    model: stg_supplies
+    given:
+      - input: source('ecom', 'raw_supplies')
+        rows:
+          - {id: "SUP1", sku: "SKU9", name: "Flour", cost: 100, perishable: false}
+    expect:
+      rows:
+        - {supply_id: "SUP1", product_id: "SKU9"}
+
+  - name: ut_stg_supplies_renames_name_to_supply_name
+    description: "Source name becomes supply_name."
+    model: stg_supplies
+    given:
+      - input: source('ecom', 'raw_supplies')
+        rows:
+          - {id: "SUP1", sku: "SKU1", name: "Compostable Bag", cost: 100, perishable: false}
+    expect:
+      rows:
+        - {supply_id: "SUP1", supply_name: "Compostable Bag"}
+
+  - name: ut_stg_supplies_cost_cents_to_dollars
+    description: "cost in cents is converted to dollars."
+    model: stg_supplies
+    given:
+      - input: source('ecom', 'raw_supplies')
+        rows:
+          - {id: "SUP1", sku: "SKU1", name: "Flour", cost: 450, perishable: false}
+    expect:
+      rows:
+        - {supply_id: "SUP1", supply_cost: 4.50}
+
+  - name: ut_stg_supplies_cost_odd_cents
+    description: "An odd cent cost converts to an exact two-decimal value."
+    model: stg_supplies
+    given:
+      - input: source('ecom', 'raw_supplies')
+        rows:
+          - {id: "SUP1", sku: "SKU1", name: "Flour", cost: 1234, perishable: false}
+    expect:
+      rows:
+        - {supply_id: "SUP1", supply_cost: 12.34}
+
+  - name: ut_stg_supplies_perishable_true_passes_through
+    description: "A perishable supply is flagged as perishable."
+    model: stg_supplies
+    given:
+      - input: source('ecom', 'raw_supplies')
+        rows:
+          - {id: "SUP1", sku: "SKU1", name: "Milk", cost: 100, perishable: true}
+    expect:
+      rows:
+        - {supply_id: "SUP1", is_perishable_supply: true}
+
+  - name: ut_stg_supplies_perishable_false_passes_through
+    description: "A non-perishable supply is flagged as not perishable."
+    model: stg_supplies
+    given:
+      - input: source('ecom', 'raw_supplies')
+        rows:
+          - {id: "SUP1", sku: "SKU1", name: "Napkin", cost: 100, perishable: false}
+    expect:
+      rows:
+        - {supply_id: "SUP1", is_perishable_supply: false}
+
+  - name: ut_stg_supplies_maps_all_columns
+    description: "All supply columns map correctly in a single row."
+    model: stg_supplies
+    given:
+      - input: source('ecom', 'raw_supplies')
+        rows:
+          - {id: "SUP1", sku: "SKU1", name: "Cheese", cost: 300, perishable: true}
+    expect:
+      rows:
+        - {supply_id: "SUP1", product_id: "SKU1", supply_name: "Cheese", supply_cost: 3.00, is_perishable_supply: true}
+
+  - name: ut_stg_supplies_allows_multiple_costs_per_supply
+    description: "A supply id can appear with multiple cost rows (one row per cost)."
+    model: stg_supplies
+    given:
+      - input: source('ecom', 'raw_supplies')
+        rows:
+          - {id: "SUP1", sku: "SKU1", name: "Cheese", cost: 300, perishable: true}
+          - {id: "SUP1", sku: "SKU2", name: "Cheese", cost: 350, perishable: true}
+    expect:
+      rows:
+        - {supply_id: "SUP1", product_id: "SKU1", supply_cost: 3.00}
+        - {supply_id: "SUP1", product_id: "SKU2", supply_cost: 3.50}
