@@ -1,6 +1,8 @@
 # 🏆 1st Place — Analytics Engineering Hackathon (Birmingham Business School × dbt Labs), 2026 
-# University Workshop Starter
-This repository is a **starting point** for an end-to-end analytics engineering project in dbt as experienced in a dbt Labs University Workshop. This repo uses the legendary [Jaffle Shop](https://github.com/dbt-labs/jaffle-shop) project for its curated sample data, but with a much smaller scope: **only seeds** are included so you can get started easily. Your job in the workshop will be to design and build your own staging layer (guided) and then the intermediate and mart layer (independently) to ultimately answer specified analytics/business question(s).
+# University Workshop Hackathon Project
+This completed dbt university hackathon project was created by [@vishalk2712](https://github.com/vishalk2712) and [@itsirfan](https://github.com/itsirfan). We developed it together in [Irfan's repository](https://github.com/itsirfan/university_workshop_starter) during the workshop and published this standalone copy with the original commit history preserved.
+
+The project began with the [dbt Labs university workshop starter](https://github.com/atrivedi-dbtlabs/university_workshop_starter). It uses curated [Jaffle Shop](https://github.com/dbt-labs/jaffle-shop) sample data and now includes staging, intermediate and mart models, tests, a profitability analysis, and presentation slides. The original starter's MIT license and attribution are retained.
 
 ## What you’re building
 By the end of the workshop, you should have:
@@ -25,19 +27,13 @@ If needed, detailed setup instructions can be found [here](https://docs.google.c
 
 ## Quickstart
 
-### 1) Fork this repo
-Follow [these instructions](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/working-with-forks/fork-a-repo#forking-a-repository) to create your own fork/version of this repo.
-
-Optionally, [sync your forked repo](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/working-with-forks/fork-a-repo#configuring-git-to-sync-your-fork-with-the-upstream-repository) to the main upstream starter repo so you can pull any changes to it later.
-
-### 2) Clone that repo locally using VS Code
-Follow [these instructions](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/working-with-forks/fork-a-repo#cloning-your-forked-repository) to clone your forked repo for local development in VS Code.
+### 1) Clone this repo locally using VS Code
 ```
-git clone <YOUR_REPO_URL>
-cd <YOUR_REPO_NAME>
+git clone https://github.com/vishalk2712/university_workshop_starter.git
+cd university_workshop_starter
 ```
 
-### 3) Confirm your dbt profile name matches `dbt_project.yml` (important)
+### 2) Confirm your dbt profile name matches `dbt_project.yml` (important)
 This project’s `dbt_project.yml` includes a `profile:` value (for example, `default`). **That value must match the profile name you have configured for BigQuery dev credentials in your `profiles.yml`.**
 
 - If your `dbt_project.yml` says `profile: default`, then your `profiles.yml` must have a top-level profile named `default:`. In this starter repo, the `dbt_project.yml` says `profile: university_workshop`, so make sure you have a top-level profile named `university_workshop` in your `profiles.yml` file.
@@ -48,7 +44,7 @@ Typical locations:
 
 If the names do not match, dbt will fail with a “profile not found” style error.
 
-### 4) Seed the curated source data (raw layer)
+### 3) Seed the curated source data (raw layer)
 This starter uses dbt **seeds** as the “raw” tables for the project.
 
 Run: `dbt seed`
@@ -56,11 +52,13 @@ Run: `dbt seed`
 ---
 
 ## Project structure
-You have:
+This completed project has:
 - `seeds/`  
   Curated CSVs that dbt loads into your warehouse (commonly into a `raw` schema or dataset).
-
-You do **not** have staging or marts models in this repo. You will create the staging layer in the guided portion of the workshop and the marts layer based on the question(s) you have chosen to answer.
+- `models/staging/` for cleaned Jaffle Shop source data.
+- `models/intermediate/` for reusable supply cost calculations.
+- `models/marts/` for the profitability analysis.
+- `models/moms_flower_shop/staging/` for the additional flower shop staging exercise. Its source definition currently names the workshop BigQuery project; update it to your own project before building those models.
 
 ### Recommended build-out
 
