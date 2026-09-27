@@ -1,8 +1,8 @@
-# 🏆 1st Place — Analytics Engineering Hackathon (Birmingham Business School × dbt Labs), 2026 
+# 🥈 Runner-up (2nd place) — Analytics Engineering Hackathon (Birmingham Business School × dbt Labs), 2026
 # University Workshop Hackathon Project
-This completed dbt university hackathon project was created by [@vishalk2712](https://github.com/vishalk2712) and [@itsirfan](https://github.com/itsirfan). We developed it together in [Irfan's repository](https://github.com/itsirfan/university_workshop_starter) during the workshop and published this standalone copy with the original commit history preserved.
+I am Vishal ([@vishalk2712](https://github.com/vishalk2712)). I presented this dbt project at the university hackathon and finished runner-up (2nd place). This repository records the project and its profitability analysis.
 
-The project began with the [dbt Labs university workshop starter](https://github.com/atrivedi-dbtlabs/university_workshop_starter). It uses curated [Jaffle Shop](https://github.com/dbt-labs/jaffle-shop) sample data and now includes staging, intermediate and mart models, tests, a profitability analysis, and presentation slides. The original starter's MIT license and attribution are retained.
+The project began with the [dbt Labs university workshop starter](https://github.com/atrivedi-dbtlabs/university_workshop_starter). It uses curated [Jaffle Shop](https://github.com/dbt-labs/jaffle-shop) sample data and includes staging, intermediate and mart models, tests, and a profitability analysis. The original starter's MIT license and the repository's Git history are retained.
 
 ## What you’re building
 By the end of the workshop, you should have:
