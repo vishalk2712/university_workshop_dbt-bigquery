@@ -1,8 +1,4 @@
-# Jaffle Shop Profitability Analysis
-
 **Runner-up (2nd place), Analytics Engineering Hackathon — Birmingham Business School × dbt Labs, 2026**
-
-Presented by **Vishal** ([@vishalk2712](https://github.com/vishalk2712))
 
 ## Project overview
 
