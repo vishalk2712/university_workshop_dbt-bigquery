@@ -1,4 +1,4 @@
-**Runner-up (2nd place), Analytics Engineering Hackathon — Birmingham Business School × dbt Labs, 2026**
+##🥈Runner-up (2nd place), Analytics Engineering Hackathon — Birmingham Business School × dbt Labs, 2026**
 
 ## Project overview
 
