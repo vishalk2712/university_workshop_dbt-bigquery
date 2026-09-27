@@ -4,7 +4,7 @@ models:
   - name: int_supply_costs_per_sku
     description: >
       Aggregates stg_supplies to one row per SKU, splitting total supply cost into
-      perishable vs. non-perishable dollars. Exists to prevent fan-out/duplicated
+      perishable vs. non-perishable cents. Exists to prevent fan-out/duplicated
       revenue when supply costs are later joined onto products or order items.
     columns:
       - name: sku

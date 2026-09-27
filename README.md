@@ -1,250 +1,60 @@
-# 🥈 Runner-up (2nd place) — Analytics Engineering Hackathon (Birmingham Business School × dbt Labs), 2026
-# University Workshop Hackathon Project
-I am Vishal ([@vishalk2712](https://github.com/vishalk2712)). I presented this dbt project at the university hackathon and finished runner-up (2nd place). This repository records the project and its profitability analysis.
+# Jaffle Shop Profitability Analysis
 
-The project began with the [dbt Labs university workshop starter](https://github.com/atrivedi-dbtlabs/university_workshop_starter). It uses curated [Jaffle Shop](https://github.com/dbt-labs/jaffle-shop) sample data and includes staging, intermediate and mart models, tests, and a profitability analysis. The original starter's MIT license and the repository's Git history are retained.
+**Runner-up (2nd place), Analytics Engineering Hackathon — Birmingham Business School × dbt Labs, 2026**
 
-## What you’re building
-By the end of the workshop, you should have:
-- A specific, relevant analytics question (or small set) stated up front; perhaps opting for 1 primary, 2–4 supporting questions
-- A dbt project that runs end-to-end on **BigQuery**
-- At least one **`dim_*`** and/or **`fct_*`** model that clearly answers the stated question(s)
-- 2–4 tests (at minimum `not_null` and `unique` on primary keys, plus one business-logic test)
-- Descriptions for key models and columns so someone new can easily follow the work
-- A short write-up in the README, or elsewhere in the repo, with at least one insight stated and supported by data evidence and at least one realistic next step that follows from the insight(s)
+Presented by **Vishal** ([@vishalk2712](https://github.com/vishalk2712))
 
----
+## Project overview
 
-## Prerequisites
-- BigQuery project + dataset you can write to
-- dbt (Fusion + VS Code extension) installed and working
-- Git installed and a GitHub account
-- A working BigQuery connection configured in `profiles.yml`
+This dbt project uses curated Jaffle Shop data to answer a business question: **which product types generate the most gross profit, and how much of their supply cost comes from perishable ingredients?** I presented the analysis at the university hackathon and finished runner-up.
 
-If needed, detailed setup instructions can be found [here](https://docs.google.com/document/d/1_9MhrFGBjv0MShmynGwTzi2aHLPFDkD7ZTcCxj-iyag/edit?usp=sharing)
+The repository began with the [dbt Labs university workshop starter](https://github.com/atrivedi-dbtlabs/university_workshop_starter). The completed project adds staging, intermediate, and mart models, data quality tests, and a profitability analysis in BigQuery. The original MIT license and Git history are retained.
 
----
+## Analytical approach
 
-## Quickstart
+The analysis uses six seed tables: customers, orders, items, products, stores, and supplies. Each row in `raw_items` represents one unit sold; the source has no quantity field. The model treats the product price as revenue per item and sums the linked supply costs as cost per item.
 
-### 1) Clone this repo locally using VS Code
-```
-git clone https://github.com/vishalk2712/university_workshop_starter.git
-cd university_workshop_starter
-```
+| Model layer | Main assets | Role in the analysis |
+| --- | --- | --- |
+| Staging | `stg_customers`, `stg_orders`, `stg_items`, `stg_products`, `stg_stores`, `stg_supplies` | Standardize source fields and document each table's grain. |
+| Intermediate | `int_supply_costs_per_sku` | Aggregate supply costs to one row per product SKU before joining, avoiding duplicated revenue from the one-to-many supply relationship. |
+| Marts | `dim_products_enriched`, `fct_order_items` | Combine item revenue, total supply cost, perishable supply cost, and gross profit at the sold-item level. |
 
-### 2) Confirm your dbt profile name matches `dbt_project.yml` (important)
-This project’s `dbt_project.yml` includes a `profile:` value (for example, `default`). **That value must match the profile name you have configured for BigQuery dev credentials in your `profiles.yml`.**
+The key measures are:
 
-- If your `dbt_project.yml` says `profile: default`, then your `profiles.yml` must have a top-level profile named `default:`. In this starter repo, the `dbt_project.yml` says `profile: university_workshop`, so make sure you have a top-level profile named `university_workshop` in your `profiles.yml` file.
+- **Gross profit:** item revenue minus aggregated supply cost.
+- **Gross margin:** gross profit divided by revenue.
+- **Perishable cost share:** perishable supply cost divided by total supply cost.
 
-Typical locations:
-- In the hidden `.dbt` folder: `~/.dbt/profiles.yml`
-- If you are using a repo-local profile (optional): `./profiles.yml`, make sure it is gitignored, otherwise your credentials will be made public!
+Schema tests cover unique and non-null identifiers, the combined supply-and-product key, and non-negative cost values. The SQL models keep monetary values in **cents**, as provided in the seed files; the dollar amounts below are presentation conversions.
 
-If the names do not match, dbt will fail with a “profile not found” style error.
+## Findings
 
-### 3) Seed the curated source data (raw layer)
-This starter uses dbt **seeds** as the “raw” tables for the project.
+| Product type | Revenue, USD (source cents) | Supply cost, USD (source cents) | Gross profit, USD (source cents) | Gross margin | Perishable cost share |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Beverage | $4,510.00 (451,000) | $890.89 (89,089) | $3,619.11 (361,911) | 80.25% | 72.89% |
+| Jaffle | $2,308.00 (230,800) | $514.83 (51,483) | $1,793.17 (179,317) | 77.69% | 89.18% |
 
-Run: `dbt seed`
+Beverages lead on both revenue and gross profit; the ranking does not reverse when costs are included. Jaffles have a higher perishable cost share (89.18% versus 72.89%) and a lower gross margin (77.69% versus 80.25%). The roughly 16-percentage-point difference in perishable cost share coincides with a roughly 2.5-point difference in margin.
 
----
+**Business recommendation:** Review supplier terms for the perishable ingredients used in jaffles and assess shelf-stable substitutes. These are the most relevant cost levers suggested by the observed product-type difference. Re-run the analysis by store when other locations have order history.
 
-## Project structure
-This completed project has:
-- `seeds/`  
-  Curated CSVs that dbt loads into your warehouse (commonly into a `raw` schema or dataset).
-- `models/staging/` for cleaned Jaffle Shop source data.
-- `models/intermediate/` for reusable supply cost calculations.
-- `models/marts/` for the profitability analysis.
-- `models/moms_flower_shop/staging/` for the additional flower shop staging exercise. Its source definition currently names the workshop BigQuery project; update it to your own project before building those models.
+## Scope and limitations
 
-### Recommended build-out
+All **686 orders** in the seed data belong to the Philadelphia store. The other five stores have no order history, so the data does not support a comparison of store-level profitability. The per-item cost is estimated from the static supply list and the one-unit-per-item assumption; the observed relationship between perishable cost share and margin does not establish causation.
 
-#### Staging (`models/staging/`)
+## Reproduce the analysis
 
-Create `stg_*` models that:
+Configure a writable BigQuery project and a local dbt `profiles.yml` entry named `university_workshop` (the file is intentionally excluded from Git). Then run:
 
-- rename fields consistently (`customer` → `customer_id`, `type` → `product_type`, etc.)
-- cast types (BigQuery: `CAST(...)` / `SAFE_CAST(...)`)
-- standardize timestamps/dates
-
-Example BigQuery casts:
-
-```
-SAFE_CAST(price AS NUMERIC) AS price,
-TIMESTAMP(ordered_at) AS ordered_at
+```bash
+dbt deps
+dbt seed
+dbt build --select +fct_order_items +dim_products_enriched
 ```
 
-To guide you through the staging layer build, you can follow [these instructions](https://docs.google.com/document/d/1Gy0f35WMmFM0Sh8kWpfQ1nSeFnmhWrFatISbTA3B534/edit?usp=sharing).
+The separate `models/moms_flower_shop/staging/` exercise is not part of this profitability analysis. Its source configuration refers to a workshop BigQuery project and needs updating before it can be built in another environment.
 
-#### Intermediate (`models/intermediate/`)
+## Sources and license
 
-Reusable joins / business logic:
-
-- `int_sales_enriched`: items + orders + products + stores (+ supplies)
-- `int_customer_orders`: customer order history + sequencing
-- `int_item_finance`: item-level revenue/cost/margin fields
-
-#### Marts (`models/marts/`)
-
-Final models that answer your question(s):
-
-- `dim_*` for entities (customer, product, store, date)
-- `fct_*` for measurable events (order, sale line, daily rollups)
-
----
-
-## BigQuery notes (common gotchas)
-- Make sure your BigQuery credential (typically the locally saved JSON file) has permission to:
-  - create tables/views
-  - create and write to datasets
-  It is easiest to just give the service account `Owner` permissions
-- Be explicit about your target dataset (schema) in `profiles.yml` so you can easily find your outputs.
-- If you switch GCP projects or datasets, rerun `dbt debug` to confirm everything is wired correctly.
-
-Useful commands:
-```
-dbt debug
-dbt parse
-dbt compile
-dbt ls
-```
-
----
-
-## Suggested workflow (ADLC)
-1. **Plan**
-   - Write questions, entities, grain, and expected outputs
-   - You can place these in a top-level `plan.md` file in your project
-2. **Develop**
-   - Add staging, marts (and, optionally, intermediate) models with clear naming and layering
-3. **Test**
-   - Add tests early, document columns and models whilst you're in the YAML files
-4. **Deploy**
-   - Ensure everything builds end-to-end locally and push changes to `main`
-5. **Operate (optional for workshop)**
-   - Schedule your project to run via a job (optionally, schedule it) on dbt Platform
-6. **Observe**
-   - Check lineage and data quality signals via test results
-7. **Discover**
-   - Add any additional useful descriptions and documentation to the project, models, and columns.
-8. **Analyze**
-   - Query your marts (or build an output artifact) and write 1–2 insights plus next steps
-
----
-
-## Suggested analytics questions (if you're struggling to create your own)
-
-Pick **1 primary question** and **2–4 supporting questions**. Then build:
-
-- `models/staging/` → clean + standardize seeded raw tables
-- `models/intermediate/` → reusable joins + business logic (`int_*`)
-- `models/marts/` → business-facing outputs (`dim_*`, `fct_*`) that answer the question(s)
-
-**Seeded raw tables:**
-
-- `raw_customers(id, name)`
-- `raw_orders(id, customer, ordered_at, store_id, subtotal, tax_paid, order_total)`
-- `raw_items(id, order_id, sku)`
-- `raw_products(sku, name, type, price, description)`
-- `raw_stores(id, name, opened_at, tax_rate)`
-- `raw_supplies(id, name, cost, perishable, sku)`
-
-### Join map
-
-- `raw_orders.customer` → `raw_customers.id`
-- `raw_orders.store_id` → `raw_stores.id`
-- `raw_items.order_id` → `raw_orders.id`
-- `raw_items.sku` → `raw_products.sku`
-- `raw_supplies.sku` → `raw_products.sku` (and to `raw_items.sku`)
-
-## Option A: Profitability — Which products and stores are most profitable?
-
-**Primary question:** Which products (and stores) drive the most profit?
-
-**Supporting questions:**
-
-- Which **product types** have the highest **gross margin** and **margin %**?
-- Which **stores** drive the most **profit** vs the most **revenue** (not always the same)?
-- How much profit comes from **perishable** vs **non-perishable** products?
-
-**Suggested marts:**
-
-- `dim_product` (SKU-level attributes, including cost/perishable)
-- `dim_store`
-- `fct_sales_line` (one row per sold item) **or** `fct_product_profit_daily` (aggregated)
-
-**Implementation hint:** `raw_items` is line-level but doesn’t include quantity. A simple, consistent approach is to treat **each row in `raw_items` as 1 unit sold** and use `raw_products.price` as revenue per unit and `raw_supplies.cost` as cost per unit.
-
-## Option B: Product performance — What are customers buying, and how does mix vary by store over time?
-
-**Primary question:** What products sell best, and how does the product mix differ by store and over time?
-
-**Supporting questions:**
-
-- What are the **top SKUs** and **top product types** by **units sold** and **revenue**?
-- Do stores have distinct “bestsellers” (store-specific product mix)?
-- How does product mix change over time (`ordered_at`)?
-
-**Suggested marts:**
-
-- `dim_product`, `dim_store` (and optionally `dim_date`)
-- `fct_product_sales_daily` (grain: `order_date + sku (+ store_id)`)
-
-## Option C: Customers — Who are repeat customers and what do they buy?
-
-**Primary question:** Who are our repeat customers, and what patterns predict repeat purchasing?
-
-**Supporting questions:**
-
-- What % of customers are **one-time vs repeat** purchasers?
-- What is **time-to-second-order** for repeat customers?
-- Do repeat customers prefer certain **product types** (and do they have higher order totals)?
-
-**Suggested marts:**
-
-- `dim_customer`
-- `fct_orders` (order grain, enriched with customer + store)
-- `dim_customer_summary` (customer grain: order_count, repeat_flag, days_to_second_order, total_spend)
-
----
-
-## Workshop requirements checklist (use this to self-review)
-- [ ] Defined primary + supporting analytics questions
-- [ ] Built at least one `dim_*` and/or `fct_*` model
-- [ ] Added schema tests for keys (unique, not_null)
-- [ ] Added at least one “business logic” test (accepted values, or custom test)
-- [ ] Added descriptions to key models and columns
-- [ ] Ran `dbt build` successfully with a clean output
-- [ ] README (or a file elsewhere in the repo) includes: At least one insight stated and supported by data evidence (numbers, comparison, trend, segment, etc.) and at least one realistic next step that follows from the insight(s)
-
----
-
-## Workshop deliverables
-At the end of the workshop you will:
-- Have a link to your GitHub repo
-- Present what you have done covering the items in the `Workshop requirements checklist` above
-- Bonus: You may choose to also produce a dashboard (can be screenshots), SQL queries in BigQuery, or a Python notebook that tells the story.
-
----
-
-## Analytics Write-Up: Profitability (Option A)
-
-**Primary question:** Which product types generate the highest gross profit, and what share of margin erosion is attributable to perishable supply costs?
-
-**Success criteria:** `fct_order_items` (grain: one row per order line) carries per-line revenue, aggregated supply cost, and gross margin, letting every supporting question be answered with one `GROUP BY` query.
-
-**Data note:** All 686 orders in the seed data belong to a single store (Philadelphia); the other 5 stores in `stg_stores` have no order history. Store-level profitability comparisons aren't possible with this dataset, so the analysis is cut by `product_type` instead.
-
-**Insight:**
-
-| product_type | revenue | cost | gross profit | margin % | perishable cost share |
-|---|---|---|---|---|---|
-| beverage | $451,000 | $89,089 | $361,911 | 80.25% | 72.89% |
-| jaffle | $230,800 | $51,483 | $179,317 | 77.69% | 89.18% |
-
-Beverages lead on both revenue and profit — there's no revenue/profit ranking reversal here. The real signal is the **perishable cost share**: jaffles source 89% of their supply cost from perishable inputs vs. 73% for beverages, and that ~16-point gap lines up with jaffles running a 2.5-point-lower margin. Perishable input exposure, not overall demand, is the main lever separating the two product lines' profitability.
-
-**Next step:** Prioritize renegotiating supplier contracts (or exploring shelf-stable substitutes) for the perishable ingredients behind jaffles specifically — that's where a cost reduction would move margin the most. As more stores start generating order volume, re-run this model cut by `store_id` as well to check whether the pattern holds geographically.
+The sample data comes from the [Jaffle Shop](https://github.com/dbt-labs/jaffle-shop) project through the [university workshop starter](https://github.com/atrivedi-dbtlabs/university_workshop_starter). The starter's [MIT license](LICENSE) remains in this repository.
